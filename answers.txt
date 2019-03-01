@@ -1,0 +1,27 @@
+## Place your answers here.
+ 
+Part 1:
+
+When looking for a buffer in which to perform a buffer overflow attack on we decided to attack the buffer in https_request_headers(). In order to perform this attack we modified the http request to include a header greater than 512 characters (in this case we used a string about 10,000 chracters long). This allowed us to crash the server by overflowing value[].
+
+Part 2:
+
+For this part we started off by modifying the assembly code in the following way: 
+1) Change the string to hold the path to the grades.txt file
+2) change the strlen to be the length of that path (22) 
+3) use SYS_unlink to unlink this file
+4) SYS_unlink only takes a path as a parameter so comment out other arguments
+Now that we have the file unlinked we then modified the python file "exploit-3.py". First we find the buffer adress as well as the return address of that buffer. In this case we focused on the same buffer as we exploited in part 1 (value[]) so using gdb we found both these addresses. We then just followed the technique mentioned in the paper
+to modify the shellcode. Because we know that the buffer value takes in the header from the http request, we insert the shell code as a header, deleting the file after this code is run.  
+
+Part 3:
+
+In order to unlink /home/httpd/grades.txt we followed the steps in the following way:
+I padded the buffer with "A"s until I reach the return address. At the return address I called accidentally , which then but the address of our filename address into the argument of unlink. Then unlink is called with that address as an argument. The order went pad + accidentally + unlink + address_of_file_name.
+
+Part 4: 
+
+Bug 1: We can exploit http_serve_file(). In http_serve we can exploit our HTTP request to send a realative path to some file and that request will be put in “pn” in http_serve. This will then send that request to http_serve_file and be executed. An example would be getting access to the following file: "GET /../../../etc/passwd HTTP/1.0\r\n”. In order to partially solve this, we can use a chroot jail so that the user can’t read any files outside of the current directory. 
+Bug 2: In line 347 in http.c under dir_join there is strcpy(dst,dirname) but this method should not be used since strcpy does not check for size limits, causing possible buffer overflows. A better method would be to use stncpy.
+
+In order to solve the bugs in the code, I put a limit on the length of the http request. If it excedes it then nothing happens. 
